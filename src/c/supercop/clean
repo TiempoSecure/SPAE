@@ -1,0 +1,18 @@
+#!/bin/sh
+
+rm -f supercop_spae_aes128_ref
+rm -f supercop_spae_aes128_amd64aesni
+rm -f supercop_spae_aes128_sle
+rm -f supercop_spae_aes128_fle
+rm -f spae_aead
+rm -f spae_aead_ref
+rm -f spae_aead_sle
+rm -f spae_aead_fle
+
+
+
+rm -f LWC_AEAD_KAT_128_128.txt
+rm -f ref_LWC_AEAD_KAT_128_128.txt
+rm -f amd64aesni_LWC_AEAD_KAT_128_128.txt
+rm -f sle_LWC_AEAD_KAT_128_128.txt
+rm -f fle_LWC_AEAD_KAT_128_128.txt

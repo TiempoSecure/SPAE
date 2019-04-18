@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+
+from spae_aes128 import SpaeCipher
+import sys
+import binascii
+
+if len(sys.argv) != 5:
+    print("ERROR: need exactly 4 arguments: key,nonce,message,associatedData")
+    exit()
+key = binascii.unhexlify(sys.argv[1])
+nonce = binascii.unhexlify(sys.argv[2])
+message = binascii.unhexlify(sys.argv[3])
+associatedData = binascii.unhexlify(sys.argv[4])
+out = SpaeCipher.SPAE_enc(key,nonce,message,associatedData)
+SpaeCipher.printBytesAsHex(out)

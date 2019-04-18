@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+import subprocess
+import sys
+import binascii
+#from spae_aes128 import SpaeCipher
+
+
+
+def call(binaryPath, message, ad):
+    if len(message):
+        message = binascii.hexlify(message).decode("utf-8")
+    else:
+        message = "''"
+    if len(ad):
+        ad = binascii.hexlify(ad).decode("utf-8")
+    else:
+        ad = "''"
+    cmd = binaryPath+" 6454EFE6E138783B0CCCEFDE73D83074  6873C8555B0BE7B123898EB60160C281 "+message+" "+ad
+    #cmd = binaryPath+" 000102030405060708090A0B0C0D0E0F  000102030405060708090A0B0C0D0E00 "+message+" "+ad
+    #print(cmd)
+    out = subprocess.check_output(
+        cmd,
+        stderr=subprocess.STDOUT,
+        shell=True)
+    return (cmd,out)
+
+
+
+if __name__ == "__main__":
+    dutp = "spae_aead"
+    dutc = None
+    if len(sys.argv)>=2:
+        dutc = sys.argv[1]
+    if len(sys.argv)>=3:
+        dutp = sys.argv[2]
+    if dutc is None:
+        dutc = dutp
+
+    message = binascii.unhexlify(b'')
+    for i in range(0,16):
+        ad = binascii.unhexlify(b'')
+        for j in range(0,16):
+            (c_cmd,c_out) = call("../c/supercop/%s"%dutc, message, ad)
+            (py_cmd,py_out) = call("./%s"%dutp, message, ad)
+
+            if py_out != c_out:
+                print("ERROR: mismatch between Python and C implementation")
+                print("messageBytes: ",binascii.hexlify(message).decode("utf-8"))
+                print("Python: ",py_out.decode("utf-8"),end="")
+                print("C:      ",c_out.decode("utf-8"),end="")
+                print("C CMD:",c_cmd)
+                exit(-1)
+
+            print(py_out.decode("utf-8"),end="")
+
+            ad += (((j+11)*19)%256).to_bytes(1,'little')
+            if i > 5:
+                ad += (((j+11)*19)%256).to_bytes(1,'little')*4
+
+        message += (((i+13)*17)%256).to_bytes(1,'little')
+        if i > 8:
+            message += (((i+13)*17)%256).to_bytes(1,'little')*16

@@ -1,0 +1,57 @@
+#!/bin/sh
+
+./clean
+
+gcc -std=c99 -Wall -Wextra -Wshadow -fsanitize=address,undefined -O3 -I . -I ./crypto_aead/spae_aes128/ref/ genkat_aead.c ./crypto_aead/spae_aes128/ref/encrypt.c -o supercop_spae_aes128_ref
+gcc -std=c99 -Wall -Wextra -Wshadow -fsanitize=address,undefined -I . -I ./crypto_aead/spae_aes128/sle/ genkat_aead.c ./crypto_aead/spae_aes128/sle/encrypt.c -o supercop_spae_aes128_sle
+gcc -std=c99 -Wall -Wextra -Wshadow -fsanitize=address,undefined -I . -I ./crypto_aead/spae_aes128/fle/ genkat_aead.c ./crypto_aead/spae_aes128/fle/encrypt.c -o supercop_spae_aes128_fle
+
+gcc -std=c99 -Wall -Wextra -Wshadow -fsanitize=address,undefined -O3 -msse2 -msse -march=native -maes -I . -I ./crypto_aead/spae_aes128/amd64aesni/ genkat_aead.c ./crypto_aead/spae_aes128/amd64aesni/encrypt.c -o supercop_spae_aes128_amd64aesni
+
+echo "ref"
+gcc -std=c11 -Wall -Wextra -Wshadow -D SPAE_REF -fsanitize=address,undefined -I . -I ./crypto_aead/spae_aes128/ref/ main_aead.c -o spae_aead_ref
+
+echo "fle"
+gcc -std=c11 -Wall -Wextra -Wshadow -D SPAE_FLE -fsanitize=address,undefined -I . -I ./crypto_aead/spae_aes128/fle/ main_aead.c -o spae_aead_fle
+
+echo "sle"
+gcc -std=c11 -Wall -Wextra -Wshadow -D SPAE_SLE -fsanitize=address,undefined -I . -I ./crypto_aead/spae_aes128/sle/ main_aead.c -o spae_aead_sle
+
+echo "aesni"
+gcc -std=c11 -Wall -Wextra -Wshadow -O3 -march=native -maes -mavx -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2 -I . -I ./crypto_aead/spae_aes128/amd64aesni/ main_aead.c -o spae_aead
+#gcc -std=c11 -Wall -Wextra -Wshadow -O3 -march=native -maes -mavx -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2 -I . -I ./crypto_aead/spae_aes128/amd64aesni/ main_aead.c -S -o spae_aead.s
+
+./supercop_spae_aes128_ref
+mv LWC_AEAD_KAT_128_128.txt ref_LWC_AEAD_KAT_128_128.txt
+
+./supercop_spae_aes128_sle
+diff -q ref_LWC_AEAD_KAT_128_128.txt LWC_AEAD_KAT_128_128.txt
+if [ $? -eq 1 ]; then
+    echo supercop_spae_aes128_sle
+    diff --side-by-side ref_LWC_AEAD_KAT_128_128.txt LWC_AEAD_KAT_128_128.txt | head --lines=20
+fi
+mv LWC_AEAD_KAT_128_128.txt sle_LWC_AEAD_KAT_128_128.txt
+
+./supercop_spae_aes128_fle
+diff -q ref_LWC_AEAD_KAT_128_128.txt LWC_AEAD_KAT_128_128.txt
+if [ $? -eq 1 ]; then
+    echo supercop_spae_aes128_fle
+    diff --side-by-side ref_LWC_AEAD_KAT_128_128.txt LWC_AEAD_KAT_128_128.txt | head --lines=20
+fi
+mv LWC_AEAD_KAT_128_128.txt fle_LWC_AEAD_KAT_128_128.txt
+
+
+./supercop_spae_aes128_amd64aesni
+diff -q ref_LWC_AEAD_KAT_128_128.txt LWC_AEAD_KAT_128_128.txt
+if [ $? -eq 1 ]; then
+    echo supercop_spae_aes128_amd64aesni
+    diff --side-by-side ref_LWC_AEAD_KAT_128_128.txt LWC_AEAD_KAT_128_128.txt | head --lines=20
+fi
+mv LWC_AEAD_KAT_128_128.txt amd64aesni_LWC_AEAD_KAT_128_128.txt
+
+
+
+#diff -q ref_LWC_AEAD_KAT_128_128.txt amd64aesni_LWC_AEAD_KAT_128_128.txt
+#if [ $? -eq 1 ]; then
+#    diff --side-by-side ref_LWC_AEAD_KAT_128_128.txt amd64aesni_LWC_AEAD_KAT_128_128.txt | head --lines=20
+#fi
