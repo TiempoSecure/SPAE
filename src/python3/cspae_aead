@@ -17,12 +17,15 @@ if len(sys.argv) == 6:
 
 if verbose:
     print("CSPAE-AES-%d"%(len(key)*8))
-    print("key:             ",end="");SpaeCipher.printBytesAsHex(key)
-    print("nonce:           ",end="");SpaeCipher.printBytesAsHex(nonce)
-    print("message:         ",end="");SpaeCipher.printBytesAsHex(message)
-    print("associated data: ",end="");SpaeCipher.printBytesAsHex(associatedData)
+    print("key length:             %d bits"%(len(key)*8))
+    print("message length:         %d bytes"%len(message))
+    print("associated data length: %d bytes"%len(associatedData))
+    print("key:                    ",end="");SpaeCipher.printBytesAsHex(key)
+    print("nonce:                  ",end="");SpaeCipher.printBytesAsHex(nonce)
+    print("message:                ",end="");SpaeCipher.printBytesAsHex(message)
+    print("associated data:        ",end="");SpaeCipher.printBytesAsHex(associatedData)
 out = SpaeCipher.CSPAE_enc(key,nonce,message,associatedData)
 
 if verbose:
-    print("cipher and tag:  ",end="")
+    print("cipher and tag:         ",end="")
 SpaeCipher.printBytesAsHex(out)

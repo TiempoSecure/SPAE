@@ -3,7 +3,6 @@ SPAE Single Pass Authenticated Encryption v0.12
 Sebastien Riou, November 18th 2018
 
 "Fast Little Endian" implementation: favor speed over code size
-TODO: decryption still use "ref" AES, switch to optimized one
 It is meant to fit in the supercop framework
 */
 
@@ -34,7 +33,6 @@ It is meant to fit in the supercop framework
 #endif
 
 #include <string.h>
-#include "aes_ref.h"
 
 #define SPAE_FLE_PASS 0
 #define SPAE_FLE_BLOCKSIZE 16
@@ -491,8 +489,48 @@ static int mbedtls_aes_setkey_enc( mbedtls_aes_context *ctx, const unsigned char
     return( 0 );
 }
 
-static void aes_enc128_init(const void *const keyv){
-    mbedtls_aes_setkey_enc(&spae_mbedtls_aes_ctx,(const unsigned char *)keyv, 128);
+int mbedtls_aes_setkey_dec( mbedtls_aes_context *ctx, const unsigned char *key,
+                    unsigned int keybits )
+{
+    int i, j, ret;
+    mbedtls_aes_context cty;
+    uint32_t *RK;
+    uint32_t *SK;
+
+    ctx->rk = RK = ctx->buf;
+
+    /* Also checks keybits */
+    if( ( ret = mbedtls_aes_setkey_enc( &cty, key, keybits ) ) != 0 )
+        goto exit;
+
+    ctx->nr = cty.nr;
+
+    SK = cty.rk + cty.nr * 4;
+
+    *RK++ = *SK++;
+    *RK++ = *SK++;
+    *RK++ = *SK++;
+    *RK++ = *SK++;
+
+    for( i = ctx->nr - 1, SK -= 8; i > 0; i--, SK -= 8 )
+    {
+        for( j = 0; j < 4; j++, SK++ )
+        {
+            *RK++ = RT0[ FSb[ ( *SK       ) & 0xFF ] ] ^
+                    RT1[ FSb[ ( *SK >>  8 ) & 0xFF ] ] ^
+                    RT2[ FSb[ ( *SK >> 16 ) & 0xFF ] ] ^
+                    RT3[ FSb[ ( *SK >> 24 ) & 0xFF ] ];
+        }
+    }
+
+    *RK++ = *SK++;
+    *RK++ = *SK++;
+    *RK++ = *SK++;
+    *RK++ = *SK++;
+
+exit:
+
+    return( ret );
 }
 
 #define AES_FROUND(X0,X1,X2,X3,Y0,Y1,Y2,Y3)     \
@@ -599,6 +637,62 @@ static void aes_enc128_block_le32(
     PUT_UINT32_LE( X3, output, 12 );
 }
 
+static void aes_dec128_block_le32(
+    const uint64_t *const in64,
+    uint64_t *const out64 )
+{
+    const unsigned char *input=(const unsigned char *)in64;
+    unsigned char *output = (unsigned char *)out64;
+    mbedtls_aes_context *ctx = &spae_mbedtls_aes_ctx;
+
+    int i;
+    uint32_t *RK, X0, X1, X2, X3, Y0, Y1, Y2, Y3;
+
+    RK = ctx->rk;
+
+    GET_UINT32_LE( X0, input,  0 ); X0 ^= *RK++;
+    GET_UINT32_LE( X1, input,  4 ); X1 ^= *RK++;
+    GET_UINT32_LE( X2, input,  8 ); X2 ^= *RK++;
+    GET_UINT32_LE( X3, input, 12 ); X3 ^= *RK++;
+
+    for( i = ( ctx->nr >> 1 ) - 1; i > 0; i-- )
+    {
+        AES_RROUND( Y0, Y1, Y2, Y3, X0, X1, X2, X3 );
+        AES_RROUND( X0, X1, X2, X3, Y0, Y1, Y2, Y3 );
+    }
+
+    AES_RROUND( Y0, Y1, Y2, Y3, X0, X1, X2, X3 );
+
+    X0 = *RK++ ^ \
+            ( (uint32_t) RSb[ ( Y0       ) & 0xFF ]       ) ^
+            ( (uint32_t) RSb[ ( Y3 >>  8 ) & 0xFF ] <<  8 ) ^
+            ( (uint32_t) RSb[ ( Y2 >> 16 ) & 0xFF ] << 16 ) ^
+            ( (uint32_t) RSb[ ( Y1 >> 24 ) & 0xFF ] << 24 );
+
+    X1 = *RK++ ^ \
+            ( (uint32_t) RSb[ ( Y1       ) & 0xFF ]       ) ^
+            ( (uint32_t) RSb[ ( Y0 >>  8 ) & 0xFF ] <<  8 ) ^
+            ( (uint32_t) RSb[ ( Y3 >> 16 ) & 0xFF ] << 16 ) ^
+            ( (uint32_t) RSb[ ( Y2 >> 24 ) & 0xFF ] << 24 );
+
+    X2 = *RK++ ^ \
+            ( (uint32_t) RSb[ ( Y2       ) & 0xFF ]       ) ^
+            ( (uint32_t) RSb[ ( Y1 >>  8 ) & 0xFF ] <<  8 ) ^
+            ( (uint32_t) RSb[ ( Y0 >> 16 ) & 0xFF ] << 16 ) ^
+            ( (uint32_t) RSb[ ( Y3 >> 24 ) & 0xFF ] << 24 );
+
+    X3 = *RK++ ^ \
+            ( (uint32_t) RSb[ ( Y3       ) & 0xFF ]       ) ^
+            ( (uint32_t) RSb[ ( Y2 >>  8 ) & 0xFF ] <<  8 ) ^
+            ( (uint32_t) RSb[ ( Y1 >> 16 ) & 0xFF ] << 16 ) ^
+            ( (uint32_t) RSb[ ( Y0 >> 24 ) & 0xFF ] << 24 );
+
+    PUT_UINT32_LE( X0, output,  0 );
+    PUT_UINT32_LE( X1, output,  4 );
+    PUT_UINT32_LE( X2, output,  8 );
+    PUT_UINT32_LE( X3, output, 12 );
+}
+
 static void spae_aes128_enc_core(
     spae_aes128_t *const ctx,
     const void *const ib//exactly one block of input, WARNING: may also be the output
@@ -636,9 +730,12 @@ static void spae_aes128_dkn(
     const void *const i,
     void *const o
 ){
-    const uint8_t *const ib=(const uint8_t *const)i;
-    uint8_t *const ob=(uint8_t *const)o;
-    aes_ref_dec128_block(ob,0,ib,(uint8_t*)ctx->kn);
+    (void)ctx;
+    uint64_t buf[SPAE_FLE_BLOCKSIZE64];
+    uint64_t buf2[SPAE_FLE_BLOCKSIZE64];
+    memcpy(buf,i,SPAE_FLE_BLOCKSIZE);
+    aes_dec128_block_le32(buf,buf2);
+    memcpy(o,buf2,SPAE_FLE_BLOCKSIZE);
 }
 #include <assert.h>
 
@@ -649,9 +746,6 @@ static void spae_aes128_init(
     int decrypt,
     uint8_t *out_buffer//output buffer
 ){
-    //ctx->key = key;
-    (void)aes_ref_enc128_block;
-
     ctx->obuf = out_buffer;
 
     ctx->mlen=0;
@@ -913,7 +1007,8 @@ int spae_fle_aes128_dec(
         spae_aes128_process_ad(ctx,last_block);
     }
 
-    aes_enc128_init(ctx->kn);
+    //aes_enc128_init(ctx->kn);
+    mbedtls_aes_setkey_dec(&spae_mbedtls_aes_ctx, (const uint8_t* const)ctx->kn,128 );
 
     if(m){
         for(size_t i = 0; i<m-1; i++){//process all blocks except last one
@@ -934,6 +1029,7 @@ int spae_fle_aes128_dec(
         in+=SPAE_FLE_BLOCKSIZE;
     }
 
+    mbedtls_aes_setkey_enc(&spae_mbedtls_aes_ctx, (const uint8_t* const)ctx->kn,128 );
     uint64_t buf[SPAE_FLE_BLOCKSIZE64];
     spae_compute_tag(ctx,m,a,mlen,alen,(uint8_t*)buf);
 

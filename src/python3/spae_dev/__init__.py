@@ -94,30 +94,18 @@ class SpaeCipher(object):
         self.nonce=nonce
         self.key=key
         SpaeCipher.__log_secret(key)
-        #self.mt0 = self.cipher_dec(key,key)
-        #self.mt0 = self.cipher_enc(self.intToBlock(0),key)
-        #self.at0 = key
         self.at0 = self.intToBlock(0)
         self.decrypt=decrypt
         self.mbuf = b''
         self.abuf = b''
 
         if SpaeCipher.CSPAE:
-            self.ct0 = self.cipher_enc(self.xor(key,nonce),key)
-            #self.mt0 = self.xor(nonce,self.cipher_enc(self.xor(key,nonce),key))
-            self.mt0 = self.xor(self.xor(key,nonce),self.cipher_enc(self.xor(key,nonce),key))
+            self.ct0 = self.cipher_enc(self.xor(key[:self.blockSize],nonce),key)
+            self.mt0 = self.xor(self.xor(key[:self.blockSize],nonce),self.ct0)
             self.kn = key
         else:
-            #self.ct0 = key
-            #self.ct0 = self.xor(self.CST0,key)
-            #self.ct0 = self.xor(nonce,self.cipher_enc(key,key))
-            #self.ct0 = self.xor(nonce,self.cipher_enc(key,key))
-            #self.ct0 = self.xor(key,self.cipher_enc(key,key))
-            self.ct0 = self.cipher_enc(key,key)
-            self.mt0 = self.xor(key,self.cipher_enc(key,key))
-            #self.mt0 = self.cipher_enc(key,key)
-            #self.mt0 = key
-            #self.mt0 = swap64(self.mt0)
+            self.ct0 = self.cipher_enc(key[:self.blockSize],key)
+            self.mt0 = self.xor(key[:self.blockSize],self.ct0)
             self.kn = self.xor(key,nonce)
         self.cipher = self.get_cipher(self.kn)
         SpaeCipher.__log_secret(self.ct0)
@@ -149,6 +137,11 @@ class SpaeCipher(object):
 
     @staticmethod
     def xor(a,b):
+        d=len(a)-len(b)
+        if d>0:
+            b=b+bytes(d)
+        if d<0:
+            a=a+bytes(-d)
         return bytes([ (x ^ y) for (x,y) in zip(a, b) ])
 
     @staticmethod
@@ -322,9 +315,11 @@ class SpaeCipher(object):
 
     def ecore_12c(self,pt,ct,p):
         i0 = self.xor(pt,p)
-        i1 = i0 #self.xor(ct,i0)
+        i1 = i0
+        SpaeCipher.__print("aes key            = ",self.kn)
+        SpaeCipher.__print("aes din            = ",i1)
         i2 = self.cipher.encrypt(i1)
-        #i3 = self.xor(pt,i2)
+        SpaeCipher.__print("aes dout           = ",i2)
         c = self.xor(ct,i2)
         ct = self.xor(ct,pt)
         pt = self.xor(p,i2)
@@ -333,7 +328,6 @@ class SpaeCipher(object):
         SpaeCipher.__log_secret(i0)
         SpaeCipher.__log_secret(i1)
         SpaeCipher.__log_secret(i2)
-        #SpaeCipher.__log_secret(i3)
         return pt, ct, c
 
     def dcore_12c(self,pt,ct,c):
@@ -387,13 +381,8 @@ class SpaeCipher(object):
         BLOCKSIZE = self.blockSize*8
         a = (alen+BLOCKSIZE-1) // BLOCKSIZE
         if 0==a:
-            #tag = self.intToBlock(0)
             tag = self.at0
         else:
-            #tag = self.inv(self.mt0)
-            #tag = self.mt0
-            #tag = self.intToBlock(0)
-            #tag = self.cipher_enc(self.mt0,self.mt0) #self.mt0 is original key so this is static no matter the nonce
             tag = self.at0
             for i in range(0,a):
                 ai = self.abuf[i*self.blockSize:(i+1)*self.blockSize]
@@ -401,13 +390,7 @@ class SpaeCipher(object):
                 self.__print("               AT%d = "%(i+1),tag)
                 SpaeCipher.__log_secret(tag)
         if 0==mlen:
-            MT = self.intToBlock(0)
-            TT = self.intToBlock(0)
-            #MT = SpaeCipher.hswap(lastCT)
-                #TT = self.intToBlock(0)
-                #TT = lastCT
-                #TT = lastPT
-            MT = self.inv(self.key)
+            MT = self.inv(self.key[:self.blockSize])
             TT = lastPT
         else:
             MT = self.xor(lastPT,SpaeCipher.hswap(lastCT))
@@ -807,11 +790,12 @@ def checkEqual(a,b):
 
 
 def refTestVector(key=binascii.unhexlify(b'00000000000000000000000000000001'),startlst="[listing]",endlst=""):
+    keylen = len(key)*8
     SpaeCipher.verbose(1)
     nonce = binascii.unhexlify(b'00000000000000000000000000000002')
     message  = binascii.unhexlify(b'')
     associatedData  = binascii.unhexlify(b'')
-    print("\n%s"%startlst,"\nm=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    print("\n%s"%startlst,"\nAES-%d,m=%s,a=%s"%(keylen,len(message)//16,len(associatedData)//16))
     SpaeCipher.verbose(1)
     encrypted00=enc(key,nonce,message,associatedData)
     SpaeCipher.verbose(0)
@@ -819,7 +803,7 @@ def refTestVector(key=binascii.unhexlify(b'00000000000000000000000000000001'),st
 
     message  = binascii.unhexlify(b'')
     associatedData += binascii.unhexlify(b'00000000000000000000000000000006')
-    print(endlst,"\n%s"%startlst,"\nm=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    print(endlst,"\n%s"%startlst,"\nAES-%d,m=%s,a=%s"%(keylen,len(message)//16,len(associatedData)//16))
     SpaeCipher.verbose(1)
     encrypted01=enc(key,nonce,message,associatedData)
     SpaeCipher.verbose(0)
@@ -827,54 +811,54 @@ def refTestVector(key=binascii.unhexlify(b'00000000000000000000000000000001'),st
 
     message += binascii.unhexlify(b'00000000000000000000000000000003')
     associatedData  = binascii.unhexlify(b'')
-    print(endlst,"\n%s"%startlst,"\nm=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    print(endlst,"\n%s"%startlst,"\nAES-%d,m=%s,a=%s"%(keylen,len(message)//16,len(associatedData)//16))
     SpaeCipher.verbose(1)
     encrypted10=enc(key,nonce,message,associatedData)
     SpaeCipher.verbose(0)
     dec(key,nonce,encrypted10,associatedData)
 
     message += binascii.unhexlify(b'00000000000000000000000000000004')
-    print(endlst,"\n%s"%startlst,"\nm=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    print(endlst,"\n%s"%startlst,"\nAES-%d,m=%s,a=%s"%(keylen,len(message)//16,len(associatedData)//16))
     SpaeCipher.verbose(1)
     encrypted20=enc(key,nonce,message,associatedData)
     SpaeCipher.verbose(0)
     dec(key,nonce,encrypted20,associatedData)
 
     message += binascii.unhexlify(b'00000000000000000000000000000005')
-    print(endlst,"\n%s"%startlst,"\nm=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    print(endlst,"\n%s"%startlst,"\nAES-%d,m=%s,a=%s"%(keylen,len(message)//16,len(associatedData)//16))
     SpaeCipher.verbose(1)
     encrypted30=enc(key,nonce,message,associatedData)
     SpaeCipher.verbose(0)
     dec(key,nonce,encrypted30,associatedData)
 
     associatedData += binascii.unhexlify(b'00000000000000000000000000000006')
-    print(endlst,"\n%s"%startlst,"\nm=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    print(endlst,"\n%s"%startlst,"\nAES-%d,m=%s,a=%s"%(keylen,len(message)//16,len(associatedData)//16))
     SpaeCipher.verbose(1)
     encrypted31=enc(key,nonce,message,associatedData)
     SpaeCipher.verbose(0)
     dec(key,nonce,encrypted31,associatedData)
 
     associatedData += binascii.unhexlify(b'00000000000000000000000000000007')
-    print(endlst,"\n%s"%startlst,"\nm=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    print(endlst,"\n%s"%startlst,"\nAES-%d,m=%s,a=%s"%(keylen,len(message)//16,len(associatedData)//16))
     SpaeCipher.verbose(1)
     encrypted32=enc(key,nonce,message,associatedData)
     SpaeCipher.verbose(0)
     dec(key,nonce,encrypted32,associatedData)
 
     associatedData += binascii.unhexlify(b'00000000000000000000000000000008')
-    print(endlst,"\n%s"%startlst,"\nm=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    print(endlst,"\n%s"%startlst,"\nAES-%d,m=%s,a=%s"%(keylen,len(message)//16,len(associatedData)//16))
     SpaeCipher.verbose(1)
     encrypted33=enc(key,nonce,message,associatedData)
     dec(key,nonce,encrypted33,associatedData)
 
     message2 = message[:32] + binascii.unhexlify(b'09')
     associatedData2 = associatedData[:32] + binascii.unhexlify(b'0A0B')
-    print(endlst,"\n%s"%startlst,"\nm=3,a=3 padded")
+    print(endlst,"\n%s"%startlst,"\nAES-%d,m=3,a=3 padded"%keylen)
     SpaeCipher.verbose(1)
     encrypted33pad=enc(key,nonce,message2,associatedData2)
     dec(key,nonce,encrypted33pad,associatedData2,33,34)
     print(endlst)
-    gen_supercop_testvectors(enc,startlst,endlst)
+    #gen_supercop_testvectors(enc,startlst,endlst)
 
     #now do it manually
     #Ek=AES.new(key, AES.MODE_ECB)
@@ -1070,33 +1054,37 @@ def all_tests(key = binascii.unhexlify(b'00000000000000000000000000000001')):
     testSwapCorrupt(key)
     #refTestVector(key)
 
+def testit(key):
+    SpaeCipher.verbose(0)
+    SpaeCipher.log_internal_secrets(1)
+    all_tests(key)
+    adaptative_chosen_plaintext(key)
+    SpaeCipher.log_internal_secrets(0)
+    all_tests()
+    SpaeCipher.verbose(0)
+
+def gentestvect():
+    SpaeCipher.verbose(1)
+    SpaeCipher.log_internal_secrets(0)
+    refTestVector(key=binascii.unhexlify(b'00000000000000000000000000000001'),**rtvargs)
+    refTestVector(key=binascii.unhexlify(b'000000000000000000000000000000000000000000000001'),**rtvargs)
+    refTestVector(key=binascii.unhexlify(b'0000000000000000000000000000000000000000000000000000000000000001'),**rtvargs)
+    SpaeCipher.verbose(0)
 
 
 if __name__ == "__main__":
     latex_startlst="""\\begin{lstlisting}"""
     latex_endlst="""\\end{lstlisting}"""
-
-    tag_null_vs_c();
-    SpaeCipher.verbose(0)
-    SpaeCipher.log_internal_secrets(1)
-    all_tests(binascii.unhexlify(b'6694ea7d72de55cffdfdc0c440093097'))
-    adaptative_chosen_plaintext(binascii.unhexlify(b'6694ea7d72de55cffdfdc0c440093097'))
-    SpaeCipher.log_internal_secrets(0)
-    all_tests()
-    gen_supercop_testvectors(enc)
-    SpaeCipher.verbose(1)
-    refTestVector(startlst=latex_startlst,endlst=latex_endlst)
-    SpaeCipher.verbose(0)
-
+    latex=0
+    rtvargs = {}
+    if latex:
+        rtvargs = {'startlst' : latex_startlst, 'endlst' : latex_endlst}
+    #tag_null_vs_c();
+    key = binascii.unhexlify(b'6694ea7d72de55cffdfdc0c440093097')
     SpaeCipher.CSPAE = True
-    SpaeCipher.log_internal_secrets(1)
-    all_tests(binascii.unhexlify(b'6694ea7d72de55cffdfdc0c440093097'))
-    adaptative_chosen_plaintext(binascii.unhexlify(b'6694ea7d72de55cffdfdc0c440093097'))
-    SpaeCipher.log_internal_secrets(0)
-    all_tests()
-    SpaeCipher.verbose(1)
-    refTestVector(startlst=latex_startlst,endlst=latex_endlst)
-    SpaeCipher.verbose(0)
+    #gen_supercop_testvectors(enc)
+    #testit(key)
+    gentestvect()
     SpaeCipher.CSPAE = False
     #adaptative_chosen_plaintext(binascii.unhexlify(b'55555555555555555555555555555555'))
     #benchmark(16)
