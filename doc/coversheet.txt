@@ -1,0 +1,26 @@
+
+== Cover sheet
+
+Name of submitted mode of operation: SPAE
+
+Principal submitter:
+
+* Name: Sebastien Riou
+* Telephone: +33 7 82 32 02 85
+* Organization: Tiempo SAS
+* Address: Tiempo, 110 rue Blaise Pascal, Bâtiment Viseo – Inovallée, 38330 Montbonnot Saint Martin, FRANCE
+* Email: sebastien.riou@tiempo-secure.com
+
+Auxiliary submitters:
+
+* Name: Philippe Elbaz-Vincent
+** Email: philippe.elbaz-vincent@univ-grenoble-alpes.fr
+
+* Name: Cyril Hugounenq
+** Email: cyril.hugounenq@univ-grenoble-alpes.fr
+
+Name of mode’s inventors/developers:
+
+* Philippe Elbaz-Vincent
+* Cyril Hugounenq
+* Sebastien Riou
