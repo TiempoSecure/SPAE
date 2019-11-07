@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+import subprocess
+import sys
+import binascii
+#from spae_aes128 import SpaeCipher
+
+
+
+def call(binaryPath, key, nonce, message, ad):
+    if len(message):
+        message = binascii.hexlify(message).decode("utf-8")
+    else:
+        message = "''"
+    if len(ad):
+        ad = binascii.hexlify(ad).decode("utf-8")
+    else:
+        ad = "''"
+    cmd = binaryPath+" "+binascii.hexlify(key).decode("utf-8")+" "+binascii.hexlify(nonce).decode("utf-8")+" "+message+" "+ad+" verbose"
+    out = subprocess.check_output(
+        cmd,
+        stderr=subprocess.STDOUT,
+        shell=True)
+    return (cmd,out)
+
+
+
+if __name__ == "__main__":
+
+    keys = [binascii.unhexlify(b'a212cc453888b0dc36e74edd09d91d9a'),
+            binascii.unhexlify(b'a212cc453888b0dc36e74edd09d91d9aa212cc453888b0dc'),
+            binascii.unhexlify(b'a212cc453888b0dc36e74edd09d91d9aa212cc453888b0dc36e74edd09d91d9a'),
+            ]
+    nonce = binascii.unhexlify(b'6a5edf99bf03f454896426c0c7887ac4')
+    message = binascii.unhexlify(b'c81fa85c69213e95b260afc6184196c38c0e7b08a95aebdfd7ea11db765594')
+    ad = binascii.unhexlify(b'731bdd384f415c1081d08ecdc3efe5dd454792a75871ce616511d139fe10cab4de855c2209f570ef626cb211725de2a9af06')
+
+    for algo in ["spae", "cspae"]:
+        dutp = "%s_aead"%algo
+        for k in keys:
+            (py_cmd,py_out) = call("./%s"%dutp, k, nonce, message, ad)
+            print(py_out.decode("utf-8"),end="")
+            with open('%s-aes-%d.txt'%(algo,len(k)*8),'wb') as f:
+                f.write(py_out)

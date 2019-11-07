@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+
+from spae_aes import SpaeCipher
+import sys
+import binascii
+
+if (len(sys.argv) < 5) | (len(sys.argv) > 6):
+    print("ERROR: need at least 4 arguments: key,nonce,message,associatedData.\nOptional: verbose")
+    exit()
+key = binascii.unhexlify(sys.argv[1])
+nonce = binascii.unhexlify(sys.argv[2])
+message = binascii.unhexlify(sys.argv[3])
+associatedData = binascii.unhexlify(sys.argv[4])
+verbose=False
+if len(sys.argv) == 6:
+    verbose=True
+
+if verbose:
+    print("CSPAE-AES-%d"%(len(key)*8))
+    print("key:             ",end="");SpaeCipher.printBytesAsHex(key)
+    print("nonce:           ",end="");SpaeCipher.printBytesAsHex(nonce)
+    print("message:         ",end="");SpaeCipher.printBytesAsHex(message)
+    print("associated data: ",end="");SpaeCipher.printBytesAsHex(associatedData)
+out = SpaeCipher.CSPAE_enc(key,nonce,message,associatedData)
+
+if verbose:
+    print("cipher and tag:  ",end="")
+SpaeCipher.printBytesAsHex(out)
