@@ -49,7 +49,6 @@ struct spae_aes128_struct_t {
     uint64_t ct[SPAE_FLE_BLOCKSIZE64];
     uint64_t at[SPAE_FLE_BLOCKSIZE64];
     uint64_t kn[SPAE_FLE_BLOCKSIZE64];
-    spae_xor_t xor_block;
     size_t mlen;
     size_t alen;
     uint8_t *obuf;
@@ -702,10 +701,10 @@ static void spae_aes128_enc_core(
     buf[0]=ctx->ct[0];
     buf[1]=ctx->ct[1];
     spae_aes128_xor_64(ctx->ct,ctx->pt,ctx->ct);
-    ctx->xor_block(ctx->pt,ib,buf2);
+    spae_aes128_xor(ctx->pt,ib,buf2);
     aes_enc128_block_le32(buf2,buf2);
-    ctx->xor_block(buf2,ib,ctx->pt);
-    ctx->xor_block(buf2,buf,ctx->obuf);
+    spae_aes128_xor(buf2,ib,ctx->pt);
+    spae_aes128_xor(buf2,buf,ctx->obuf);
     ctx->obuf+=SPAE_FLE_BLOCKSIZE;
 }
 
@@ -869,11 +868,6 @@ void spae_fle_aes128_enc(
     );
 
     if(a){
-        /*if(SPAE_FLE_IS_ALIGNED(iad)){
-            ctx->xor_block = (spae_xor_t)spae_aes128_xor_64;
-        } else {
-            ctx->xor_block = (spae_xor_t)spae_aes128_xor;
-        }*/
         for(size_t i = 0; i<a-1; i++){//process all blocks except last one
             spae_aes128_process_ad(ctx,iad);
             iad+=SPAE_FLE_BLOCKSIZE;
@@ -888,12 +882,6 @@ void spae_fle_aes128_enc(
         spae_aes128_process_ad(ctx,last_block);
     }
 
-    /*if(SPAE_FLE_IS_ALIGNED(in) && SPAE_FLE_IS_ALIGNED(ctx->obuf)){
-        ctx->xor_block = (spae_xor_t)spae_aes128_xor_64;
-    } else {
-        ctx->xor_block = (spae_xor_t)spae_aes128_xor;
-    }*/
-    //aes_enc128_init(ctx->kn);
     mbedtls_aes_setkey_enc(&spae_mbedtls_aes_ctx, (const uint8_t* const)ctx->kn,128 );
 
     if(m){
@@ -988,11 +976,6 @@ int spae_fle_aes128_dec(
     );
 
     if(a){
-        /*if(SPAE_FLE_IS_ALIGNED(iad)){
-            ctx->xor_block = (spae_xor_t)spae_aes128_xor_64;
-        } else {
-            ctx->xor_block = (spae_xor_t)spae_aes128_xor;
-        }*/
         for(size_t i = 0; i<a-1; i++){//process all blocks except last one
             spae_aes128_process_ad(ctx,iad);
             iad+=SPAE_FLE_BLOCKSIZE;
@@ -1007,7 +990,6 @@ int spae_fle_aes128_dec(
         spae_aes128_process_ad(ctx,last_block);
     }
 
-    //aes_enc128_init(ctx->kn);
     mbedtls_aes_setkey_dec(&spae_mbedtls_aes_ctx, (const uint8_t* const)ctx->kn,128 );
 
     if(m){
