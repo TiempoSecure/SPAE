@@ -4,15 +4,16 @@ from spae_aes import SpaeCipher
 import sys
 import binascii
 
-if (len(sys.argv) < 5) | (len(sys.argv) > 6):
-    print("ERROR: need at least 4 arguments: key,nonce,message,associatedData.\nOptional: verbose")
+if (len(sys.argv) < 6) | (len(sys.argv) > 7):
+    print("ERROR: need at least 5 arguments: operation,key,nonce,message,associatedData.\nOptional: verbose")
     exit()
-key = binascii.unhexlify(sys.argv[1])
-nonce = binascii.unhexlify(sys.argv[2])
-message = binascii.unhexlify(sys.argv[3])
-associatedData = binascii.unhexlify(sys.argv[4])
+op = sys.argv[1]
+key = binascii.unhexlify(sys.argv[2])
+nonce = binascii.unhexlify(sys.argv[3])
+message = binascii.unhexlify(sys.argv[4])
+associatedData = binascii.unhexlify(sys.argv[5])
 verbose=False
-if len(sys.argv) == 6:
+if len(sys.argv) == 7:
     verbose=True
 
 if verbose:
@@ -24,8 +25,12 @@ if verbose:
     print("nonce:                  ",end="");SpaeCipher.printBytesAsHex(nonce)
     print("message:                ",end="");SpaeCipher.printBytesAsHex(message)
     print("associated data:        ",end="");SpaeCipher.printBytesAsHex(associatedData)
-out = SpaeCipher.SPAE_enc(key,nonce,message,associatedData)
 
-if verbose:
-    print("cipher and tag:         ",end="")
+if op in ['e','enc','encrypt']:
+    out = SpaeCipher.SPAE_enc(key,nonce,message,associatedData)
+elif op in ['d','dec','decreypt']:
+    out = SpaeCipher.SPAE_dec(key,nonce,message,associatedData)
+else:
+    out = SpaeCipher.SPAE_enc(key,nonce,message,associatedData)
+    SpaeCipher.SPAE_dec(key,nonce,out,associatedData)
 SpaeCipher.printBytesAsHex(out)

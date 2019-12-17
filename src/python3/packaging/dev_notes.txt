@@ -1,0 +1,23 @@
+Python dev loop:
+from packaging
+python3 spae_aes/__init__.py
+
+Python packaging:
+from packaging
+python3 setup.py sdist bdist_wheel
+
+install package:
+sudo -H pip3 install dist/spae_aes-....whl
+or
+pip3 install --user dist/spae_aes-....whl
+
+remove package (useful to update without ticking each time the version during dev/tests)
+pip3 uninstall spae_aes
+
+python3 tests/__init__.py
+
+
+
+package testing loop:
+from packaging:
+./package

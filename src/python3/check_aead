@@ -6,7 +6,7 @@ import binascii
 
 
 
-def call(binaryPath, message, ad):
+def call(binaryPath, message, ad, op):
     if len(message):
         message = binascii.hexlify(message).decode("utf-8")
     else:
@@ -15,7 +15,7 @@ def call(binaryPath, message, ad):
         ad = binascii.hexlify(ad).decode("utf-8")
     else:
         ad = "''"
-    cmd = binaryPath+" 6454EFE6E138783B0CCCEFDE73D83074  6873C8555B0BE7B123898EB60160C281 "+message+" "+ad
+    cmd = binaryPath+" "+op+" 6454EFE6E138783B0CCCEFDE73D83074  6873C8555B0BE7B123898EB60160C281 "+message+" "+ad
     #cmd = binaryPath+" 000102030405060708090A0B0C0D0E0F  000102030405060708090A0B0C0D0E00 "+message+" "+ad
     #print(cmd)
     out = subprocess.check_output(
@@ -28,6 +28,7 @@ def call(binaryPath, message, ad):
 
 if __name__ == "__main__":
     dutp = "spae_aead"
+    op="e"
     dutc = None
     if len(sys.argv)>=2:
         dutc = sys.argv[1]
@@ -35,13 +36,14 @@ if __name__ == "__main__":
         dutp = sys.argv[2]
     if dutc is None:
         dutc = dutp
-
+    if dutp != "spae_aead":
+        op=""
     message = binascii.unhexlify(b'')
     for i in range(0,16):
         ad = binascii.unhexlify(b'')
         for j in range(0,16):
-            (c_cmd,c_out) = call("../c/supercop/%s"%dutc, message, ad)
-            (py_cmd,py_out) = call("./%s"%dutp, message, ad)
+            (c_cmd,c_out) = call("../c/supercop/%s"%dutc, message, ad,"")
+            (py_cmd,py_out) = call("./%s"%dutp, message, ad,op)
 
             if py_out != c_out:
                 print("ERROR: mismatch between Python and C implementation")
