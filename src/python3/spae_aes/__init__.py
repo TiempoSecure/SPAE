@@ -150,8 +150,10 @@ class SpaeCipher(object):
         return c
 
     def __computeTag(self,mlen,alen):
+        #print("mlen ",mlen)
+        #print("self.__mlen",self.__mlen)
         if self.__decrypt:
-            mlen -= 128
+            mlen-=128
             self.__mlen -= 16
         BLOCKSIZE = self.BLOCKSIZE*8
         ct = SpaeCipher.HSWAP(self.__ct)
@@ -198,46 +200,38 @@ class SpaeCipher(object):
         return aead.enc(message,associatedData)
 
     @staticmethod
-    def SPAE_dec(key,nonce,message,associatedData,mlen=0,alen=0):
+    def SPAE_dec(key,nonce,message,associatedData):
         aead = SpaeCipher.SPAE(key,nonce,True)
-        return aead.dec(message,associatedData,mlen,alen)
+        return aead.dec(message,associatedData)
 
     @staticmethod
     def CSPAE_enc(key,nonce,message,associatedData):
         aead = SpaeCipher.CSPAE(key,nonce,False)
         return aead.enc(message,associatedData)
 
+    #,mlen=0,alen=0
     @staticmethod
-    def CSPAE_dec(key,nonce,message,associatedData,mlen=0,alen=0):
+    def CSPAE_dec(key,nonce,message,associatedData):
         aead = SpaeCipher.CSPAE(key,nonce,True)
-        return aead.dec(message,associatedData,mlen,alen)
+        #return aead.dec(message,associatedData,mlen,alen)
+        return aead.dec(message,associatedData)
 
     def enc(self,message,associatedData):
         self.addMessage(message)
         self.addAuthData(associatedData)
         return self.finalize()
 
-    def dec(self,message,associatedData,mlen=0,alen=0):
-        if 0==mlen:
-            mlen = len(message) - 16
-        if 0==alen:
-            alen = len(associatedData)
+    def dec(self,message,associatedData):
         self.addMessage(message)
         self.addAuthData(associatedData)
-        return self.finalize(mlen,alen)
+        return self.finalize()
 
-    def finalize(self,mlen=0,alen=0):
+    def finalize(self):
         assert(False == self.__finalized)
         BLOCKSIZE = self.BLOCKSIZE*8
 
-        if self.__decrypt:
-            if 0==mlen:
-                mlen = self.__mlen
-            if 0==alen:
-                alen = self.__alen
-        else:
-            mlen = self.__mlen
-            alen = self.__alen
+        mlen = self.__mlen
+        alen = self.__alen
 
         mlen = mlen * 8
         alen = alen * 8
@@ -269,8 +263,8 @@ class SpaeCipher(object):
         if self.__decrypt:
             providedTag=self.__mbuf
             if tag != providedTag:
-                print('provided tag ',binascii.hexlify(providedTag))
-                print('tag          ',binascii.hexlify(tag))
+                #print('provided tag ',binascii.hexlify(providedTag))
+                #print('tag          ',binascii.hexlify(tag))
                 raise ValueError('authentication tags different')
             #trunc output according to PADINFO
             self.__obuf = self.__obuf[:mlen//8]
@@ -523,6 +517,27 @@ def gen_supercop_testvectors_CSPAE():
 
 
 if __name__ == "__main__":
+
+    key = binascii.unhexlify(b'00000000000000000000000000000001')
+    nonce = binascii.unhexlify(b'00000000000000000000000000000002')
+    message  = binascii.unhexlify(b'')
+    associatedData  = binascii.unhexlify(b'')
+    print("m=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    encrypted00=SpaeCipher.SPAE_enc(key,nonce,message,associatedData)
+    assert(encrypted00==binascii.unhexlify(b'6b52a86d2741165af5ad9b4694d978e7'))
+    p=SpaeCipher.SPAE_dec(key,nonce,encrypted00,associatedData)
+    assert(p==message)
+
+
+    key = binascii.unhexlify(b'00000000000000000000000000000000')
+    nonce = binascii.unhexlify(b'00000000000000000000000000000002')
+    message  = binascii.unhexlify(b'375100801301010be700010013000000')
+    associatedData  = binascii.unhexlify(b'')
+    print("m=%s,a=%s"%(len(message)//16,len(associatedData)//16))
+    encrypted00=SpaeCipher.SPAE_enc(key,nonce,message,associatedData)
+    p=SpaeCipher.SPAE_dec(key,nonce,encrypted00,associatedData)
+    assert(p==message)
+
     print("self test needs update")
     #gen_supercop_testvectors_SPAE()
     #SPAE_selftest()
